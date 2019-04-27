@@ -1,9 +1,10 @@
 from scapy.all import *
 import math
+import time
 HEADER_SIZE = 40
 
-dst = 'cs144.keithw.org'
-sport = 1113
+dst = 'www.stanford.edu'
+sport = 1118
 mss = 64
 
 # syn = IP(dst=dst) / TCP(sport=sport, dport=80, flags='S', options=[('MSS', mss)])
@@ -32,9 +33,10 @@ mss = 64
 def get_iw(ip, sport, mss=64, dport=80, app_req=None, app_error_req=None):
 	# syn/syn ack handshake - make sure to set mss here
 	syn = IP(dst=ip) / TCP(sport=sport, dport=dport, flags='S', options=[('MSS', mss)])
-	syn_ack = sr1(syn, verbose=False)
+	syn_ack = sr1(syn, verbose=False, timeout=5)
+	fin = IP(dst=ip) / TCP(sport=sport, dport=dport, flags='FR', options=[('MSS', mss)])
 
-	if len(syn_ack[0]) < 1:
+	if syn_ack == None or len(syn_ack[0]) < 1:
 		return 0, 1
 
 	# create and send http request
@@ -43,25 +45,34 @@ def get_iw(ip, sport, mss=64, dport=80, app_req=None, app_error_req=None):
 		app_error_req = 'GET /' + 'a' * (10 * mss) + ' HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip
 	send(IP(dst=ip) / TCP(dport=dport, sport=syn_ack[TCP].dport, 
 		seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='A', 
-		options=[('MSS', mss)]) / app_req, verbose=True)
+		options=[('MSS', mss)]) / app_req, verbose=False)
+	fin = IP(dst=ip) / TCP(dport=dport, sport=syn_ack[TCP].dport, 
+		seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='AR', 
+		options=[('MSS', mss)])
 	replies = sniff(filter='tcp port ' + str(sport), timeout=5)	
 	# request = IP(dst=dst) / TCP(dport=80, sport=syn_ack[TCP].dport,
 	#              seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='A', options=[('MSS', mss)]) / http_req
 	# send(request)
 	# replies = sniff(filter='tcp port ' + str(sport), timeout=6)
 
-	window_size, error = get_window_size(replies, mss, syn_ack[TCP].seq)
-	# if error != 0:
+	window_size, error = get_window_size(replies, mss, syn_ack[TCP].seq, fin)
+	# if error == 3:
+	# 	time.sleep(5)
+	# 	syn = IP(dst=ip) / TCP(sport=sport, dport=dport, flags='S', options=[('MSS', mss)])
+	# 	syn_ack = sr1(syn, verbose=False, timeout=5)
+	# 	if syn_ack == None or len(syn_ack[0]) < 1:
+	# 		print('Failed new TCP handshake')
+	# 		return 0, 1
 	# 	send(IP(dst=ip) / TCP(dport=dport, sport=syn_ack[TCP].dport, 
 	# 		seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='A', 
-	# 		options=[('MSS', mss)]) / app_error_req, verbose=False)
+	# 		options=[('MSS', mss)]) / app_req, verbose=True)
 	# 	replies = sniff(filter='tcp port ' + str(sport), timeout=5)	
-	# 	window_size, error = get_window_size(replies, mss, syn_ack[TCP].seq)
+		# window_size, error = get_window_size(replies, mss, syn_ack[TCP].seq)
 	return window_size, error
 
 
 # TODO: check for first packet seqno
-def get_window_size(replies, mss, recv_ackno):
+def get_window_size(replies, mss, recv_ackno, fin=None):
 	largest_mss = mss
 	bytes_received = 0.
 	error = 0
@@ -72,6 +83,7 @@ def get_window_size(replies, mss, recv_ackno):
 	for reply in replies:
 		# if fin bit set, window has not been saturated, so return -1
 		if 'F' in reply[TCP].flags:
+	# syn_ack = sr1(syn, verbose=False, timeout=5)
 			error = 3
 
 		# # assert that the length is at least as long as the header
@@ -88,7 +100,7 @@ def get_window_size(replies, mss, recv_ackno):
 
 	# check for missing packets
 	sorted_seqno = sorted(seqno_list, key=lambda tup: tup[0])
-	print(sorted_seqno)
+	# print(sorted_seqno)
 	next_expected_seqno = recv_ackno + 1
 	for seqno, payload_len in sorted_seqno:
 		if seqno > next_expected_seqno:
@@ -101,10 +113,10 @@ def get_window_size(replies, mss, recv_ackno):
 		error = 2
 	window_size = math.ceil(bytes_received / largest_mss)
 
-	print(window_size, error)
+	# print(window_size, error)
 	return window_size, error
 
 
-window_size, error = get_iw(dst, sport)
-print(window_size, error)
+# window_size, error = get_iw(dst, sport)
+# print(window_size, error)
 
