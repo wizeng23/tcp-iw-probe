@@ -2,9 +2,9 @@ from scapy.all import *
 import math
 HEADER_SIZE = 40
 
-dst = 'cs144.keithw.org'
-sport = 1113
-mss = 64
+# dst = 'cs144.keithw.org'
+# sport = 1113
+# mss = 64
 
 # syn = IP(dst=dst) / TCP(sport=sport, dport=80, flags='S', options=[('MSS', mss)])
 # syn_ack = sr1(syn)
@@ -29,33 +29,35 @@ mss = 64
 # 3: rst/fin
 # 4: large mss
 # 5: packet drop
-def get_iw(ip, sport, mss=64):
+def get_iw(ip, sport, mss=64, dport=80, app_req=None, app_error_req=None):
 	# syn/syn ack handshake - make sure to set mss here
-	syn = IP(dst=ip) / TCP(sport=sport, dport=80, flags='S', options=[('MSS', mss)])
+	syn = IP(dst=ip) / TCP(sport=sport, dport=dport, flags='S', options=[('MSS', mss)])
 	syn_ack = sr1(syn)
 
 	if len(syn_ack[0]) < 1:
 		return 0, 1
 
 	# create and send http request
-	http_req = 'GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip
-	http_error_req = 'GET /' + 'a' * (10 * mss) + ' HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip
-	request = IP(dst=dst) / TCP(dport=80, sport=syn_ack[TCP].dport,
-	             seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='A', options=[('MSS', mss)]) / http_req
-	send(request)
-	replies = sniff(filter='tcp port ' + str(sport), timeout=6)
+	if app_req == None:
+		app_req = 'GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip
+		app_error_req = 'GET /' + 'a' * (10 * mss) + ' HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip
+	send(IP(dst=dst) / TCP(dport=dport, sport=syn_ack[TCP].dport, 
+		seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='A', 
+		options=[('MSS', mss)]) / app_req)
+	replies = sniff(filter='tcp port ' + str(sport), timeout=6)	
+	# request = IP(dst=dst) / TCP(dport=80, sport=syn_ack[TCP].dport,
+	#              seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='A', options=[('MSS', mss)]) / http_req
+	# send(request)
+	# replies = sniff(filter='tcp port ' + str(sport), timeout=6)
 
 	window_size, error = get_window_size(replies, mss, syn_ack[TCP].seq)
-	if window_size == -1:
-		replies, _ = send_http_req(http_error_req, syn_ack[TCP].seq)
+	if error != 0:
+		send(IP(dst=dst) / TCP(dport=dport, sport=syn_ack[TCP].dport, 
+			seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='A', 
+			options=[('MSS', mss)]) / app_error_req)
+		replies = sniff(filter='tcp port ' + str(sport), timeout=6)	
 		window_size, error = get_window_size(replies, mss, syn_ack[TCP].seq)
 	return window_size, error
-
-def send_http_req(http_req, sport, recv_ackno, recv_seqno):
-	req = IP(dst=dst) / TCP(dport=80, sport=sport,
-             seq=recv_ackno, ack=recv_seqno + 1, flags='A', options=[('MSS', mss)]) / http_req
-	# timeout of 3 seconds based on tcp standards
-	return sr(req, multi=True, timeout=3)
 
 
 # TODO: check for first packet seqno
