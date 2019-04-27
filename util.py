@@ -41,7 +41,7 @@ def get_iw(ip, sport, mss=64, dport=80, app_req=None, app_error_req=None):
 	if app_req == None:
 		app_req = 'GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip
 		app_error_req = 'GET /' + 'a' * (10 * mss) + ' HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip
-	send(IP(dst=dst) / TCP(dport=dport, sport=syn_ack[TCP].dport, 
+	send(IP(dst=ip) / TCP(dport=dport, sport=syn_ack[TCP].dport, 
 		seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='A', 
 		options=[('MSS', mss)]) / app_req)
 	replies = sniff(filter='tcp port ' + str(sport), timeout=6)	
@@ -52,7 +52,7 @@ def get_iw(ip, sport, mss=64, dport=80, app_req=None, app_error_req=None):
 
 	window_size, error = get_window_size(replies, mss, syn_ack[TCP].seq)
 	if error != 0:
-		send(IP(dst=dst) / TCP(dport=dport, sport=syn_ack[TCP].dport, 
+		send(IP(dst=ip) / TCP(dport=dport, sport=syn_ack[TCP].dport, 
 			seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='A', 
 			options=[('MSS', mss)]) / app_error_req)
 		replies = sniff(filter='tcp port ' + str(sport), timeout=6)	

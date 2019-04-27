@@ -1,15 +1,6 @@
 import pickle
 from scapy.all import *
-
-ip_list = ['104.196.238.229', '172.217.6.7', '171.67.215.200']
-categories = {1:[], 2:[], 3:[], 4:[], 5:[]}
-mss = 100
-reps = 5
-sport = 10
-filename = 'categories'
-
-def get_iw(ip, mss, sport):
-    return mss*10, 'status'
+import util as U
 
 # returns category and the result number
 def get_category(results):
@@ -35,13 +26,34 @@ def get_category(results):
         return 5, 0
 
 def main():
+    # keith, google, stanford
+    ip_list = ['104.196.238.229', '172.217.6.7', '171.67.215.200']
+    mss = 100
+    reps = 5
+    sport = 1100
+    result_format = 'results-mss{}reps{}.csv'
+    category_format = 'categories-mss{}-reps{}'
+    categories = {1:[], 2:[], 3:[], 4:[], 5:[]}
+    result_filename = result_format.format(mss, reps)
+    result_file = open(result_filename, 'w')
     for ip in ip_list:
         results = []
+        statuses = []
+        print('IP: {}'.format(ip))
         for _ in range(reps):
-            iw, status = get_iw(ip, mss, sport)
+            print('Rep')
+            iw, status = U.get_iw(ip, sport)
+            sport += 1
             results.append(iw)
+            statuses.append(status)
         category, result = get_category(results)
         categories[category].append((ip, result))
+        result_str = ','.join([str(res) for res in results])
+        status_str = ','.join([str(stat) for stat in statuses])
+        print(result_str)
+        print(status_str)
+        result_file.write('{},{},{}\n'.format(ip, result_str, status_str))
+    result_file.close()
 
     print('Number of IPs: {}'.format(len(ip_list)))
     print('---------------')
@@ -63,9 +75,10 @@ def main():
     print('ICW 5+: {}'.format(len(results) - result_total))
     print('Total: {}'.format(len(results)))
 
-    with open(filename, 'wb') as file:
-        pickle.dump(categories, file)
-    print('Saved categories pickle to "{}"'.format(filename))
+    category_filename = category_format.format(mss, reps)
+    with open(category_filename, 'wb') as category_file:
+        pickle.dump(categories, category_file)
+    print('Saved categories pickle to "{}"'.format(category_filename))
 
 if __name__ == '__main__':
     main()
