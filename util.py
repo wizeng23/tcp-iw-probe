@@ -1,6 +1,7 @@
 from scapy.all import *
 import math
 import time
+import csv
 HEADER_SIZE = 40
 
 dst = 'www.stanford.edu'
@@ -116,7 +117,20 @@ def get_window_size(replies, mss, recv_ackno, fin=None):
 	# print(window_size, error)
 	return window_size, error
 
+def get_ip_list(filename='top500.domains.05.18.csv'):
+	ip_list = []
+	with open(filename) as csv_file:
+		csv_reader = csv.reader(csv_file, delimiter=',')
+		line_count = 0
+		for row in csv_reader:
+			if line_count != 0:
+				# remove last character ('/') because it fucks up the dns
+				ip_list.append(row[1][:-1])
+			line_count += 1
+	return ip_list
 
-# window_size, error = get_iw(dst, sport)
-# print(window_size, error)
+
+
+
+
 
