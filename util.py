@@ -117,7 +117,7 @@ def get_window_size(replies, mss, recv_ackno, fin=None):
 	# print(window_size, error)
 	return window_size, error
 
-def get_ip_list(filename='top500.domains.05.18.csv'):
+def get_ip_list(filename='experiment/top500.domains.05.18.csv'):
 	ip_list = []
 	with open(filename) as csv_file:
 		csv_reader = csv.reader(csv_file, delimiter=',')

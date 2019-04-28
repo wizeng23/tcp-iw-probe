@@ -87,8 +87,8 @@ def main():
     reps = 5
     max_workers = 100
     sport = random.randint(1024, 10000)
-    result_format = 'results-mss{}reps{}.csv'
-    category_format = 'categories-mss{}-reps{}'
+    result_format = 'experiment/results-mss{}reps{}.csv'
+    category_format = 'experiment/categories-mss{}-reps{}'
     category_lock = Lock()
     categories = {1:[], 2:[], 3:[], 4:[], 5:[]}
     result_filename = result_format.format(mss, reps)
