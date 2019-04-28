@@ -1,9 +1,10 @@
 import util
 from scapy.all import *
 
+# file to test invidividual sites
 def main():
-    ip = 'imgur.com'
-    sport = 2000
+    ip = 'google.com'
+    sport = 2001
     reps = 5
     mss = 64
     util.repeat_iw_query(ip, sport, reps, mss, None, None)

@@ -12,11 +12,11 @@ result_filename = 'experiment/current/results.csv'
 def main():
     # keith, google, stanford
     # ip_list = ['104.196.238.229', '172.217.6.7', '171.67.215.200']
-    ip_list = U.get_ip_list('data/top10.csv')
+    ip_list = U.get_ip_list(amount=1000)
     print('Got IP list')
     mss = 64
     reps = 5
-    max_workers = 10
+    max_workers = 3
     sport = random.randint(1024, 10000)
     category_lock = Lock()
     categories = {1:[], 2:[], 3:[], 4:[], 5:[]}

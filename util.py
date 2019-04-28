@@ -4,21 +4,6 @@ import time
 import csv
 HEADER_SIZE = 40
 
-dst = 'www.stanford.edu'
-sport = 1118
-mss = 64
-
-# syn = IP(dst=dst) / TCP(sport=sport, dport=80, flags='S', options=[('MSS', mss)])
-# syn_ack = sr1(syn)
-# getStr = 'GET /hello HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % dst
-# request = IP(dst=dst) / TCP(dport=80, sport=syn_ack[TCP].dport,
-#              seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='A', options=[('MSS', mss)]) / getStr
-# send(request)
-# replies = sniff(filter='tcp port ' + str(sport), timeout=5)
-# for i in range(len(replies)):
-#     print(replies[i][1])
-
-
 # (IP, mss, sport) -> Initial window size
 
 # returns -1 window size if initial window not fully exhausted
@@ -31,50 +16,30 @@ mss = 64
 # 4: large mss
 # 5: packet drop
 def get_iw(ip, sport, app_req, mss=64, dport=80):
-    print('Getting {}'.format(ip))
+    # print('Getting {}'.format(ip))
     # syn/syn ack handshake - make sure to set mss here
     syn = IP(dst=ip) / TCP(sport=sport, dport=dport, flags='S', options=[('MSS', mss)])
-    syn_ack = sr1(syn, verbose=False, timeout=5)
-    print('Got {} synack'.format(ip))
-    # fin = IP(dst=ip) / TCP(sport=sport, dport=dport, flags='FR', options=[('MSS', mss)])
+    syn_ack = sr1(syn, verbose=False, timeout=3.5)
+    # print('Got {} synack'.format(ip))
 
     if syn_ack == None or len(syn_ack[0]) < 1:
+        # print('Synack empty')
         return -1, 1
 
     # create and send http request
-    # if app_req == None:
-        # app_req = 'GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip
-        # app_error_req = 'GET /' + 'a' * (10 * mss) + ' HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip
     send(IP(dst=ip) / TCP(dport=dport, sport=syn_ack[TCP].dport, 
         seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='A', 
         options=[('MSS', mss)]) / app_req, verbose=False)
-    print('Sending for {}'.format(ip))
-    replies = sniff(filter='tcp port ' + str(sport), timeout=5)
-    print('Finished sniffing for {}, {} replies'.format(ip, len(replies)))
-    # request = IP(dst=dst) / TCP(dport=80, sport=syn_ack[TCP].dport,
-    #              seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='A', options=[('MSS', mss)]) / http_req
-    # send(request)
-    # replies = sniff(filter='tcp port ' + str(sport), timeout=6)
-
-    # fin = IP(dst=ip) / TCP(dport=dport, sport=syn_ack[TCP].dport, 
-    #     seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='AR', 
-    #     options=[('MSS', mss)])
-    return get_window_size(replies, mss, syn_ack[TCP].seq)
-    # if error == 3:
-    #     time.sleep(5)
-    #     syn = IP(dst=ip) / TCP(sport=sport, dport=dport, flags='S', options=[('MSS', mss)])
-    #     syn_ack = sr1(syn, verbose=False, timeout=5)
-    #     if syn_ack == None or len(syn_ack[0]) < 1:
-    #         print('Failed new TCP handshake')
-    #         return 0, 1
-    #     send(IP(dst=ip) / TCP(dport=dport, sport=syn_ack[TCP].dport, 
-    #         seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='A', 
-    #         options=[('MSS', mss)]) / app_req, verbose=True)
-    #     replies = sniff(filter='tcp port ' + str(sport), timeout=5)    
-    # window_size, error = get_window_size(replies, mss, syn_ack[TCP].seq)
+    # print('Sending for {}'.format(ip))
+    replies = sniff(filter='tcp port ' + str(sport), timeout=3.5)
+    # print('Finished sniffing for {}, {} replies'.format(ip, len(replies)))
+    rst = IP(dst=ip) / TCP(dport=dport, sport=syn_ack[TCP].dport, 
+        seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='AR')
+    send(rst, verbose=False)
+    return get_window_size(ip, replies, mss, syn_ack[TCP].seq)
 
 # TODO: check for first packet seqno
-def get_window_size(replies, mss, recv_ackno):
+def get_window_size(ip, replies, mss, recv_ackno):
     largest_mss = mss
     bytes_received = 0
     error = 0
@@ -98,10 +63,10 @@ def get_window_size(replies, mss, recv_ackno):
             largest_mss = payload_len
             return -1, 4
 
-
     # check for missing packets
     sorted_seqno = sorted(seqno_list, key=lambda tup: tup[0])
-    # print(sorted_seqno)
+    # seqno_string = ','.join(['({},{})'.format(elem[0], elem[1]) for elem in sorted_seqno])
+    # print('{}: {}'.format(ip, seqno_string))
     next_expected_seqno = recv_ackno + 1
     for seqno, payload_len in sorted_seqno:
         if seqno > next_expected_seqno:
@@ -110,6 +75,7 @@ def get_window_size(replies, mss, recv_ackno):
             bytes_received += payload_len
             next_expected_seqno += payload_len
 
+    # print('{}: {}, {}'.format(ip, bytes_received, largest_mss))
     if bytes_received == 0:
         return -1, 2
     window_size = math.ceil(bytes_received / largest_mss)
@@ -145,7 +111,8 @@ def repeat_iw_query(ip, sport, reps, mss, visited_ip, visited_lock):
     # if ip[0].isalpha():
     #     dns_req = IP(dst='8.8.8.8')/UDP(dport=53)/DNS(rd=1, qd=DNSQR(qname=ip))
     #     answer = sr1(dns_req, verbose=False)
-    #     ip = answer[DNS].an.rdata
+    #     if answer and answer[DNS] and answer[DNS].an:
+    #         ip = answer[DNS].an.rdata
 
     # lot of human-readable addresses in database resolve to same ip address
     # should only query each ip address once
@@ -157,7 +124,7 @@ def repeat_iw_query(ip, sport, reps, mss, visited_ip, visited_lock):
         else:
             visited_ip.add(ip)
             visited_lock.release()
-    print('IP: {}'.format(ip))
+    # print('IP: {}'.format(ip))
     http_req = 'GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip
     http_error_req = 'GET /' + 'a' * (10 * mss) + ' HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip
     results = []
@@ -173,7 +140,7 @@ def repeat_iw_query(ip, sport, reps, mss, visited_ip, visited_lock):
             iw = -1
         sport += 1
         if not use_error_req and error == 3:
-            print('Switching to http error string')
+            # print('Switching to http error string')
             i = 0
             use_error_req = True
             results = []
@@ -182,20 +149,23 @@ def repeat_iw_query(ip, sport, reps, mss, visited_ip, visited_lock):
         i += 1
         results.append(iw)
         errors.append(error)
-    print('{:25s} {}' .format('Initial Window Results:', str(results)))
-    print('{:25s} {}' .format('Returned Code:', str(errors)))
+    # print('{:25s} {}' .format('Initial Window Results:', str(results)))
+    # print('{:25s} {}' .format('Returned Code:', str(errors)))
     return results, errors
 
-def get_ip_list(filename='data/top500.domains.05.18.csv'):
+# retrieves the first `amount` entries from the ip list
+# TODO: offset parameter to get ip's 1001-2000 for example
+def get_ip_list(amount=100, filename='data/ip_list.csv'):
     ip_list = []
     with open(filename) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
         line_count = 0
         for row in csv_reader:
             if line_count != 0:
-                # remove last character ('/') because it fucks up the dns
-                ip_list.append(row[1][:-1])
+                ip_list.append(row[1])
             line_count += 1
+            if len(ip_list) >= amount:
+                break
     return ip_list
 
 
