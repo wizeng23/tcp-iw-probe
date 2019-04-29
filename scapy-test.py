@@ -1,11 +1,13 @@
 import util
 from scapy.all import *
+import random
 
 # file to test invidividual sites
 def main():
-    ip = 'google.com'
-    sport = 2001
-    reps = 5
+    ip = 'stanford.edu'
+    sport = random.randint(1024, 10000)
+    print('Using sport %d' % sport)
+    reps = 1
     mss = 64
     util.repeat_iw_query(ip, sport, reps, mss, None, None)
 

@@ -2,9 +2,16 @@ from scapy.all import *
 import math
 import time
 import csv
+from multiprocessing import Process, Pipe
+
 HEADER_SIZE = 40
 
 # (IP, mss, sport) -> Initial window size
+
+def sniff_wrapper(filter, timeout, conn):
+	conn.send(sniff(filter=filter, timeout=timeout))
+	conn.close()
+	# reply.append(replies)
 
 # returns -1 window size if initial window not fully exhausted
 # returns tuple of window size, error code
@@ -27,18 +34,33 @@ def get_iw(ip, sport, app_req, mss=64, dport=80):
         return -1, 1
 
     # create and send http request
+    cur_time = time.time()
+    parent_conn, child_conn = Pipe()
+    sniff_args = {'filter': 'tcp port ' + str(sport), 'timeout': 5, 'conn': child_conn}
+    p = Process(target=sniff_wrapper, kwargs=sniff_args)
+    print('Starting sniff at time %f' % (time.time() - cur_time))
+    p.start()
+    # p = Pool(1)
+    # p.starmap(sniff, [('filter', 'tcp port 80'), ('')])
+    print('Sending IP packet at time %f' % (time.time() - cur_time))
     send(IP(dst=ip) / TCP(dport=dport, sport=syn_ack[TCP].dport, 
         seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='A', 
         options=[('MSS', mss)]) / app_req, verbose=False)
     # print('Sending for {}'.format(ip))
-    replies = sniff(filter='tcp port ' + str(sport), timeout=3.5)
+    # replies = p.map(sniff, {'filter':'tcp port 80', 'timeout':1})
+    # print('%f seconds have passed' % (time.time() - cur_time))
+    replies = parent_conn.recv()
+    parent_conn.close()
+    p.join()
+    # replies = sniff_reply[0]
+    print('Recovered replies at time %f' % (time.time() - cur_time))
+    # replies = sniff(filter='tcp port 80', timeout=5)
     # print('Finished sniffing for {}, {} replies'.format(ip, len(replies)))
     rst = IP(dst=ip) / TCP(dport=dport, sport=syn_ack[TCP].dport, 
         seq=syn_ack[TCP].ack, ack=syn_ack[TCP].seq + 1, flags='AR')
     send(rst, verbose=False)
     return get_window_size(ip, replies, mss, syn_ack[TCP].seq)
 
-# TODO: check for first packet seqno
 def get_window_size(ip, replies, mss, recv_ackno):
     largest_mss = mss
     bytes_received = 0
@@ -47,7 +69,9 @@ def get_window_size(ip, replies, mss, recv_ackno):
 
     # parse lengths, flags of replies
     # for req, reply in replies:
+    print("Replies length: %d" % len(replies))
     for reply in replies:
+        print(reply.show())
         # if fin bit set, window has not been saturated, so return -1
         if 'F' in reply[TCP].flags:
             return -1, 3
@@ -124,7 +148,6 @@ def repeat_iw_query(ip, sport, reps, mss, visited_ip, visited_lock):
         else:
             visited_ip.add(ip)
             visited_lock.release()
-    # print('IP: {}'.format(ip))
     http_req = 'GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip
     http_error_req = 'GET /' + 'a' * (10 * mss) + ' HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip
     results = []
@@ -145,12 +168,14 @@ def repeat_iw_query(ip, sport, reps, mss, visited_ip, visited_lock):
             use_error_req = True
             results = []
             errors = []
+            time.sleep(1)
             continue
         i += 1
         results.append(iw)
         errors.append(error)
-    # print('{:25s} {}' .format('Initial Window Results:', str(results)))
-    # print('{:25s} {}' .format('Returned Code:', str(errors)))
+    print('IP: {}'.format(ip))
+    print('{:25s} {}' .format('Initial Window Results:', str(results)))
+    print('{:25s} {}' .format('Returned Code:', str(errors)))
     return results, errors
 
 # retrieves the first `amount` entries from the ip list
