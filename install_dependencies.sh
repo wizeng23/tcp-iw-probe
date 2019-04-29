@@ -3,4 +3,3 @@ cd scapy
 sudo python setup.py install
 cd ../
 sudo rm -rf scapy/
-# might need to add tqdm dependency

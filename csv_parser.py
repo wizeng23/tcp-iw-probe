@@ -14,5 +14,3 @@ def get_ip_list(filename='data/majestic_million.csv'):
                 file.write('{},{}\n'.format(line_count, ip))
             line_count += 1
     file.close()
-
-get_ip_list()

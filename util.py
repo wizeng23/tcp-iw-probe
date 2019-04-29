@@ -6,8 +6,7 @@ from multiprocessing import Process, Pipe, Pool
 
 HEADER_SIZE = 40
 
-# (IP, mss, sport) -> Initial window size
-
+# wrapper for scapy sniff used in multiprocessing
 def sniff_wrapper(filter, timeout, conn):
 	conn.send(sniff(filter=filter, timeout=timeout))
 	conn.close()
@@ -25,16 +24,15 @@ def get_iw(ips, sport, app_req, mss=64, dport=80):
     if len(ips) < 1:
         return []
     begin_time = time.time()
-    sniff_timeout = 2.5 + len(ips) * 0.01
-    # print('Sniff timeout: %f' % sniff_timeout)
+    sniff_timeout = 5.0 + len(ips) * 0.01
     return_values = [None for _ in range(len(ips))]
     syn_acks = [None for _ in range(len(ips))]
     # syn/syn ack handshake - make sure to set mss here
     pool = Pool(processes=len(ips))
     pool_syn = [None for _ in range(len(ips))]
     pool_kwargs = {'verbose':False, 'timeout':sniff_timeout}
+    # send syn asynchronously
     for i, ip in enumerate(ips):
-        # print(ip)
         try:
             syn = IP(dst=ip) / TCP(sport=sport + i, dport=dport, flags='S', options=[('MSS', mss)])
             pool_syn[i] = (pool.apply_async(sr1, syn, kwds=pool_kwargs))
@@ -49,7 +47,7 @@ def get_iw(ips, sport, app_req, mss=64, dport=80):
         if syn_acks[i] == None or len(syn_acks[i][0]) < 1:
             return_values[i] = (-1, 1)
       
-    # create and send http request
+    # create separate process to sniff packets for all ips at the same time
     parent_conn, child_conn = Pipe()
     sniff_args = {'filter': 'tcp port ' + str(dport), 'timeout': sniff_timeout, 'conn': child_conn}
     p = Process(target=sniff_wrapper, kwargs=sniff_args)
@@ -65,7 +63,8 @@ def get_iw(ips, sport, app_req, mss=64, dport=80):
                 options=[('MSS', mss)]) / app_req[i], verbose=False)
         except Exception as e:
             return_values[i] = (-1, 1)
-    # print('Took %f seconds to send %d requests' % (time.time() - cur_time, len(ips)))
+
+    # retrieve returned sniff result from separate process
     replies = parent_conn.recv()
     parent_conn.close()
     p.join()
@@ -75,9 +74,10 @@ def get_iw(ips, sport, app_req, mss=64, dport=80):
                 seq=syn_acks[i][TCP].ack, ack=syn_acks[i][TCP].seq + 1, flags='AR')
             send(rst, verbose=False)
             return_values[i] = get_window_size(ip, sport + i, replies, mss, syn_acks[i][TCP].seq)
-    # print('Overall, took %f seconds for one round of %d IP addresses' % (time.time() - begin_time, len(ips)))
     return return_values
 
+# gets window size for communication matching given sport in set of replies
+# returns window size, error tuple as defined in get_iw header
 def get_window_size(ip, sport, replies, mss, recv_ackno):
     largest_mss = mss
     bytes_received = 0
@@ -85,14 +85,11 @@ def get_window_size(ip, sport, replies, mss, recv_ackno):
     seqno_list = []
 
     # parse lengths, flags of replies
-    # for req, reply in replies:
-    # print("Replies length: %d" % len(replies))
-    # print('IP: %s' % ip)
     for reply in replies:
-        # print(reply.show())
-        # if fin bit set, window has not been saturated, so return -1
+        # only process packets that have matching dport with sport
         if reply[TCP].dport != sport:
         	continue
+        # if fin bit set, window has not been saturated, so return -1
         if 'F' in reply[TCP].flags:
             return -1, 3
 
@@ -109,8 +106,6 @@ def get_window_size(ip, sport, replies, mss, recv_ackno):
 
     # check for missing packets
     sorted_seqno = sorted(seqno_list, key=lambda tup: tup[0])
-    # seqno_string = ','.join(['({},{})'.format(elem[0], elem[1]) for elem in sorted_seqno])
-    # print('{}: {}'.format(ip, seqno_string))
     next_expected_seqno = recv_ackno + 1
     for seqno, payload_len in sorted_seqno:
         if seqno > next_expected_seqno:
@@ -119,12 +114,10 @@ def get_window_size(ip, sport, replies, mss, recv_ackno):
             bytes_received += payload_len
             next_expected_seqno += payload_len
 
-    # print('{}: {}, {}'.format(ip, bytes_received, largest_mss))
     if bytes_received == 0:
         return -1, 2
     window_size = math.ceil(bytes_received / largest_mss)
 
-    # print(window_size, error)
     return window_size, error
 
 # returns category and the result number
@@ -150,6 +143,7 @@ def get_category(results):
     else:
         return 5, 0
 
+# makes dns query for ip address if ip is human readable address
 def try_dns(ip):
     if ip[0].isalpha():
         dns_req = IP(dst='8.8.8.8')/UDP(dport=53)/DNS(rd=1, qd=DNSQR(qname=ip))
@@ -158,40 +152,44 @@ def try_dns(ip):
             return answer[DNS].an.rdata
     return ip
 
+# repeat an initial_window query for a given number of reps
 def repeat_iw_query(ips, sport, reps, mss):
-    # if human-readable address, perform DNS query
-    start_time = time.time()
-    urls = ips
+    # make dns query for human readable addresses
     ips = [try_dns(ip) for ip in ips]
-    # print('Took {:.2f}s for DNS'.format(time.time() - start_time))
 
-    begin_time = time.time()
-    ips = list(ips)
+    # copy ips list in order to be able to modify it
+    ips = list(ips) 
     http_reqs = ['GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip for ip in ips]
     http_error_reqs = ['GET /' + 'a' * (10 * mss) + ' HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip for ip in ips]
     results = [[] for _ in range(len(ips))]
     errors = [[] for _ in range(len(ips))]
+
+    # these are for if http 30x error is returned: then http_error_req is sent
     use_error_req = [False for _ in range(len(ips))]
     error_ips = []
     error_idxs = []
     error_reqs = []
     for _ in range(reps):
         windows_results = get_iw(ips, sport, http_reqs)
-        # print(windows_results)
         for i, (iw, error) in enumerate(windows_results):
             if error != 0:
                 iw = -1
             results[i].append(iw)
             errors[i].append(error)
+            # if not enough data returned, try adding long uri request
             if not use_error_req[i] and error == 3:
                 use_error_req[i] = True
                 error_ips.append(ips[i])
                 error_idxs.append(i)
                 error_reqs.append(http_error_reqs[i])
+        # one sport used per ip, so increment by len(ips)
         sport += len(ips)
+
+    # reset error results
     for i in error_idxs:
         results[i] = []
         errors[i] = []
+    # resend error requests reqs number of times
     for _ in range(reps):
         windows_results = get_iw(error_ips, sport, error_reqs)
         for i, (iw, error) in enumerate(windows_results):
@@ -200,13 +198,6 @@ def repeat_iw_query(ips, sport, reps, mss):
             results[error_idxs[i]].append(iw)
             errors[error_idxs[i]].append(error) 
         sport += len(error_ips)
-
-    # print('{:25s} {}' .format('IP: ', ips))
-    # print('{:25s} {}' .format('Initial Window Results:', str(results)))
-    # print('{:25s} {}' .format('Returned Code:', str(errors)))
-    # print('Total Time: %f' % (time.time() - begin_time))
-    # for i in range(len(ips)):
-    #     print(urls[i], ips[i], use_error_req[i], results[i], errors[i])
     return results, errors, use_error_req
 
 # retrieves the first `amount` entries from the ip list
