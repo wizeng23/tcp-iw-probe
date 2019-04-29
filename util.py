@@ -28,7 +28,8 @@ def get_iw(ips, sport, app_req, mss=64, dport=80):
     if len(ips) < 1:
         return []
     begin_time = time.time()
-    sniff_timeout = int(5 + len(ips) * 0.02)
+    sniff_timeout = 2.5 + len(ips) * 0.01
+    print('Sniff timeout: %f' % sniff_timeout)
     return_values = [None for _ in range(len(ips))]
     syn_acks = [None for _ in range(len(ips))]
     # syn/syn ack handshake - make sure to set mss here
@@ -71,7 +72,7 @@ def get_iw(ips, sport, app_req, mss=64, dport=80):
     sniff_args = {'filter': 'tcp port ' + str(dport), 'timeout': sniff_timeout, 'conn': child_conn}
     p = Process(target=sniff_wrapper, kwargs=sniff_args)
     p.start()
-    time.sleep(1)
+    time.sleep(0.25)
     cur_time = time.time()
     for i, ip in enumerate(ips):
         if return_values[i] != None:
@@ -181,6 +182,7 @@ def repeat_iw_query(ips, sport, reps, mss, visited_ip, visited_lock):
 
     # lot of human-readable addresses in database resolve to same ip address
     # should only query each ip address once
+    begin_time = time.time()
     if visited_lock:
         visited_lock.acquire()
         if ip in visited_ip:
@@ -238,6 +240,10 @@ def repeat_iw_query(ips, sport, reps, mss, visited_ip, visited_lock):
     print('{:25s} {}' .format('IP: ', ips))
     print('{:25s} {}' .format('Initial Window Results:', str(results)))
     print('{:25s} {}' .format('Returned Code:', str(errors)))
+    print('Total Time: %f' % (time.time() - begin_time))
+    for i in range(len(ips)):
+        print(ips[i], results[i], errors[i])
+    # print(zip(ips, results, errors))
     return results, errors
 
 # retrieves the first `amount` entries from the ip list

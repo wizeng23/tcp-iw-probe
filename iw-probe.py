@@ -25,9 +25,9 @@ def main():
     visited_ip = set()
     visited_lock = Lock()
 
-    pbar = tqdm(total=len(ip_list)/max_workers)
-    for i in range(len(ip_list) / max_workers):
-        outputs = U.repeat_iw_query(ips=ip_list[(i*max_workers):((i+1)*max_workers)], sport=sport, reps=reps, mss=mss, visited_ip=visited_ip, visited_lock=visited_lock)
+    pbar = tqdm(total=ceil(len(ip_list)/max_workers))
+    for i in range(ceil(len(ip_list) / max_workers)):
+        outputs = U.repeat_iw_query(ips=ip_list[(i*max_workers):((i+1)*max_workers)], sport=sport, reps=reps, mss=mss)
         for j, output in enumerate(outputs):
             results, statuses = output
             category, result = U.get_category(results)
