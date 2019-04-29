@@ -28,7 +28,8 @@ def get_iw(ips, sport, app_req, mss=64, dport=80):
     if len(ips) < 1:
         return []
     begin_time = time.time()
-    sniff_timeout = int(5 + len(ips) * 0.02)
+    sniff_timeout = 2.5 + len(ips) * 0.01
+    # print('Sniff timeout: %f' % sniff_timeout)
     return_values = [None for _ in range(len(ips))]
     syn_acks = [None for _ in range(len(ips))]
     # syn/syn ack handshake - make sure to set mss here
@@ -71,7 +72,7 @@ def get_iw(ips, sport, app_req, mss=64, dport=80):
     sniff_args = {'filter': 'tcp port ' + str(dport), 'timeout': sniff_timeout, 'conn': child_conn}
     p = Process(target=sniff_wrapper, kwargs=sniff_args)
     p.start()
-    time.sleep(1)
+    time.sleep(0.25)
     cur_time = time.time()
     for i, ip in enumerate(ips):
         if return_values[i] != None:
@@ -80,7 +81,7 @@ def get_iw(ips, sport, app_req, mss=64, dport=80):
             seq=syn_acks[i][TCP].ack, ack=syn_acks[i][TCP].seq + 1, flags='AF', 
             options=[('MSS', mss)]) / app_req[i], verbose=False)
         # sport += 1
-    print('Took %f seconds to send %d requests' % (time.time() - cur_time, len(ips)))
+    # print('Took %f seconds to send %d requests' % (time.time() - cur_time, len(ips)))
     replies = parent_conn.recv()
     parent_conn.close()
     p.join()
@@ -179,6 +180,7 @@ def repeat_iw_query(ips, sport, reps, mss):
     #     if answer and answer[DNS] and answer[DNS].an:
     #         ip = answer[DNS].an.rdata
 
+    begin_time = time.time()
     ips = list(ips)
     http_reqs = ['GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip for ip in ips]
     http_error_reqs = ['GET /' + 'a' * (10 * mss) + ' HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip for ip in ips]
@@ -228,6 +230,10 @@ def repeat_iw_query(ips, sport, reps, mss):
     print('{:25s} {}' .format('IP: ', ips))
     print('{:25s} {}' .format('Initial Window Results:', str(results)))
     print('{:25s} {}' .format('Returned Code:', str(errors)))
+    print('Total Time: %f' % (time.time() - begin_time))
+    for i in range(len(ips)):
+        print(ips[i], results[i], errors[i])
+    # print(zip(ips, results, errors))
     return results, errors
 
 # retrieves the first `amount` entries from the ip list

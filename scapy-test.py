@@ -7,7 +7,7 @@ import util as U
 def main():
     # ips = ['cs144.keithw.org', 'www.stanford.edu', 'www.google.com', 'facebook.com']
     # ips = ['cs144.keithw.org']
-    ips = U.get_ip_list(50)
+    ips = U.get_ip_list(30)
     sport = random.randint(1024, 10000)
     print('Using sport %d' % sport)
     reps = 5
