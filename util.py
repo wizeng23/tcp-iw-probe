@@ -29,7 +29,6 @@ def get_iw(ips, sport, app_req, mss=64, dport=80):
         return []
     begin_time = time.time()
     sniff_timeout = int(5 + len(ips) * 0.02)
-    print('Using sniff_timeout of %d' % sniff_timeout)
     return_values = [None for _ in range(len(ips))]
     syn_acks = [None for _ in range(len(ips))]
     # syn/syn ack handshake - make sure to set mss here
