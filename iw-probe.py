@@ -13,7 +13,7 @@ result_filename = 'experiment/current/results.csv'
 def main():
     # keith, google, stanford
     # ip_list = ['104.196.238.229', '172.217.6.7', '171.67.215.200']
-    ip_list = U.get_ip_list(amount=60)
+    ip_list = U.get_ip_list(amount=60, offset=0)
     print('Got IP list')
     mss = 64
     reps = 5

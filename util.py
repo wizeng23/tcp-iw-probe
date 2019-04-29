@@ -244,14 +244,13 @@ def repeat_iw_query(ips, sport, reps, mss):
     return results, errors, use_error_req
 
 # retrieves the first `amount` entries from the ip list
-# TODO: offset parameter to get ip's 1001-2000 for example
-def get_ip_list(amount=100, filename='data/ip_list.csv'):
+def get_ip_list(amount=100, offset=0, filename='data/ip_list.csv'):
     ip_list = []
     with open(filename) as csv_file:
         csv_reader = csv.reader(csv_file, delimiter=',')
         line_count = 0
         for row in csv_reader:
-            if line_count != 0:
+            if line_count >= offset + 1:
                 ip_list.append(row[1])
             line_count += 1
             if len(ip_list) >= amount:
