@@ -172,13 +172,20 @@ def get_category(results):
     else:
         return 5, 0
 
+def try_dns(ip):
+    if ip[0].isalpha():
+        dns_req = IP(dst='8.8.8.8')/UDP(dport=53)/DNS(rd=1, qd=DNSQR(qname=ip))
+        answer = sr1(dns_req, verbose=False, timeout=1)
+        if answer and answer[DNS] and answer[DNS].an:
+            return answer[DNS].an.rdata
+    return ip
+
 def repeat_iw_query(ips, sport, reps, mss):
     # if human-readable address, perform DNS query
-    # if ip[0].isalpha():
-    #     dns_req = IP(dst='8.8.8.8')/UDP(dport=53)/DNS(rd=1, qd=DNSQR(qname=ip))
-    #     answer = sr1(dns_req, verbose=False)
-    #     if answer and answer[DNS] and answer[DNS].an:
-    #         ip = answer[DNS].an.rdata
+    start_time = time.time()
+    urls = ips
+    ips = [try_dns(ip) for ip in ips]
+    print('Took {:.2f}s for DNS'.format(time.time() - start_time))
 
     begin_time = time.time()
     ips = list(ips)
@@ -203,7 +210,7 @@ def repeat_iw_query(ips, sport, reps, mss):
                 error_ips.append(ips[i])
                 error_idxs.append(i)
                 error_reqs.append(http_error_reqs[i])
-                ips[i] = None
+                # ips[i] = None
                 # http_reqs[i] = http_error_reqs[i]
                 # use_error_req = True
                 # results[i] = []
@@ -232,9 +239,9 @@ def repeat_iw_query(ips, sport, reps, mss):
     print('{:25s} {}' .format('Returned Code:', str(errors)))
     print('Total Time: %f' % (time.time() - begin_time))
     for i in range(len(ips)):
-        print(ips[i], results[i], errors[i])
+        print(urls[i], ips[i], use_error_req[i], results[i], errors[i])
     # print(zip(ips, results, errors))
-    return results, errors
+    return results, errors, use_error_req
 
 # retrieves the first `amount` entries from the ip list
 # TODO: offset parameter to get ip's 1001-2000 for example

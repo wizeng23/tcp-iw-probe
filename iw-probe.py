@@ -13,15 +13,16 @@ result_filename = 'experiment/current/results.csv'
 def main():
     # keith, google, stanford
     # ip_list = ['104.196.238.229', '172.217.6.7', '171.67.215.200']
-    ip_list = U.get_ip_list(amount=10)
+    ip_list = U.get_ip_list(amount=60)
     print('Got IP list')
     mss = 64
     reps = 5
-    max_workers = 30
+    max_workers = 20
     sport = random.randint(1024, 10000)
     category_lock = Lock()
     categories = {1:[], 2:[], 3:[], 4:[], 5:[]}
     result_file = open(result_filename, 'w')
+    result_file.write('IP,Used_error,Results,Errors\n')
     result_file_lock = Lock()
 
     itr = math.ceil(len(ip_list) / max_workers)
@@ -31,12 +32,12 @@ def main():
         ips = ip_list[(i*max_workers):end]
         outputs = U.repeat_iw_query(ips=ips, sport=sport, reps=reps, mss=mss)
         for j, output in enumerate(zip(*outputs)):
-            results, statuses = output
+            results, errors, use_error_req = output
             category, result = U.get_category(results)
             categories[category].append((ips[j], result))
             result_str = ','.join([str(res) for res in results])
-            status_str = ','.join([str(stat) for stat in statuses])
-            result_file.write('{},{},{}\n'.format(ips[j], result_str, status_str))
+            error_str = ','.join([str(error) for error in errors])
+            result_file.write('{},{},{},{}\n'.format(ips[j], use_error_req, result_str, error_str))
             pbar.update(1)
     # result_file.close()
 
