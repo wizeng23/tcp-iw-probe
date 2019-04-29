@@ -13,7 +13,7 @@ result_filename = 'experiment/current/results.csv'
 def main():
     # keith, google, stanford
     # ip_list = ['104.196.238.229', '172.217.6.7', '171.67.215.200']
-    ip_list = U.get_ip_list(amount=60, offset=0)
+    ip_list = U.get_ip_list(amount=1000, offset=0)
     print('Got IP list')
     mss = 64
     reps = 5
@@ -38,7 +38,7 @@ def main():
             result_str = ','.join([str(res) for res in results])
             error_str = ','.join([str(error) for error in errors])
             result_file.write('{},{},{},{}\n'.format(ips[j], use_error_req, result_str, error_str))
-            pbar.update(1)
+        pbar.update(1)
     # result_file.close()
 
     # with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
