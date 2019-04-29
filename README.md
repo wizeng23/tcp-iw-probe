@@ -23,8 +23,8 @@ path needed to be used, the initial window size for each repetition, and the
 error code for each repetition.
 
 ### Examples
-To probe both stanford.edu and google.com:
+To probe both stanford.edu and google.com:  
 sudo python iw-probe.py --ip=stanford.edu,google.com
 
-To probe the top 100 most popular URLs with an MSS of 128
+To probe the top 100 most popular URLs with an MSS of 128:  
 sudo python iw-probe.py --low=0 --high=100 --mss=128
