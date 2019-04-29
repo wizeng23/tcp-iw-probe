@@ -29,7 +29,7 @@ def get_iw(ips, sport, app_req, mss=64, dport=80):
         return []
     begin_time = time.time()
     sniff_timeout = 2.5 + len(ips) * 0.01
-    print('Sniff timeout: %f' % sniff_timeout)
+    # print('Sniff timeout: %f' % sniff_timeout)
     return_values = [None for _ in range(len(ips))]
     syn_acks = [None for _ in range(len(ips))]
     # syn/syn ack handshake - make sure to set mss here
@@ -81,7 +81,7 @@ def get_iw(ips, sport, app_req, mss=64, dport=80):
             seq=syn_acks[i][TCP].ack, ack=syn_acks[i][TCP].seq + 1, flags='AF', 
             options=[('MSS', mss)]) / app_req[i], verbose=False)
         # sport += 1
-    print('Took %f seconds to send %d requests' % (time.time() - cur_time, len(ips)))
+    # print('Took %f seconds to send %d requests' % (time.time() - cur_time, len(ips)))
     replies = parent_conn.recv()
     parent_conn.close()
     p.join()
