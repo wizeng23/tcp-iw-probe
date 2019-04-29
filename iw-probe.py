@@ -11,8 +11,6 @@ category_filename = 'experiment/current/categories'
 result_filename = 'experiment/current/results.csv'
 
 def main():
-    # keith, google, stanford
-    # ip_list = ['104.196.238.229', '172.217.6.7', '171.67.215.200']
     ip_list = U.get_ip_list(amount=60, offset=0)
     print('Got IP list')
     mss = 64
@@ -38,50 +36,7 @@ def main():
             result_str = ','.join([str(res) for res in results])
             error_str = ','.join([str(error) for error in errors])
             result_file.write('{},{},{},{}\n'.format(ips[j], use_error_req, result_str, error_str))
-            pbar.update(1)
-    # result_file.close()
-
-    # with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-    #     future_to_ip = {}
-    #     for ip in ip_list:
-    #         future_to_ip[executor.submit(U.repeat_iw_query, ip, sport, reps, mss)] = ip
-    #         sport += reps * 2
-    #     for future in concurrent.futures.as_completed(future_to_ip):
-    #         pbar.update(1)
-    #         ip = future_to_ip[future]
-    #         try:
-    #             data = future.result()
-    #         except Exception as exc:
-    #             print('%s generated an exception: %s' % (ip, exc))
-    #         else:
-    #             if data != None:
-    #                 results, statuses = data
-    #                 category, result = U.get_category(results)
-    #                 category_lock.acquire()
-    #                 categories[category].append((ip, result))
-    #                 category_lock.release()
-    #                 result_str = ','.join([str(res) for res in results])
-    #                 status_str = ','.join([str(stat) for stat in statuses])
-    #                 result_file_lock.acquire()
-    #                 result_file.write('{},{},{}\n'.format(ip, result_str, status_str))
-    #                 result_file_lock.release()
-    # result_file.close()
-
-        # future_to_ip = {executor.submit(repeat_iw_query, ip, ): url for url in URLS}
-        # for future in concurrent.futures_
-    # for ip in ip_list:
-
-    #     results, statuses = repeat_iw_query(ip, sport, reps)
-    #     category, result = get_category(results)
-    #     category_lock.acquire()
-    #     categories[category].append((ip, result))
-    #     category_lock.release()
-    #     result_str = ','.join([str(res) for res in results])
-    #     status_str = ','.join([str(stat) for stat in statuses])
-    #     result_file_lock.acquire()
-    #     result_file.write('{},{},{}\n'.format(ip, result_str, status_str))
-    #     result_file_lock.release()
-    # result_file.close()
+        pbar.update(1)
 
     print('Number of IPs: {}'.format(len(ip_list)))
     print('---------------')

@@ -9,11 +9,8 @@ HEADER_SIZE = 40
 # (IP, mss, sport) -> Initial window size
 
 def sniff_wrapper(filter, timeout, conn):
-	# q_lock.acquire()
 	conn.send(sniff(filter=filter, timeout=timeout))
-	# q_lock.release()
 	conn.close()
-	# reply.append(replies)
 
 # returns -1 window size if initial window not fully exhausted
 # returns tuple of window size, error code
@@ -48,27 +45,12 @@ def get_iw(ips, sport, app_req, mss=64, dport=80):
     for i in range(len(ips)):
         if return_values[i] != None:
             continue
-        # try:
         syn_acks[i] = pool_syn[i].get()
         if syn_acks[i] == None or len(syn_acks[i][0]) < 1:
             return_values[i] = (-1, 1)
-        # except Exception as e:
-        #     return_values[i] = (-1, 1)
-    # for i, ip in enumerate(ips):
-    #     # try:
-    #     syn = IP(dst=ip) / TCP(sport=sport + i, dport=dport, flags='S', options=[('MSS', mss)])
-    #     syn_acks[i] = sr1(syn, verbose=False, timeout=sniff_timeout)
-    #     if syn_acks[i] == None or len(syn_acks[i][0]) < 1:
-    #         return_values[i] = (-1, 1)
-        # except Exception as e:
-            # return_values[i] = (-1, 1)        
-
-
-
+      
     # create and send http request
     parent_conn, child_conn = Pipe()
-    # q_lock = Lock()
-    # q = Queue()
     sniff_args = {'filter': 'tcp port ' + str(dport), 'timeout': sniff_timeout, 'conn': child_conn}
     p = Process(target=sniff_wrapper, kwargs=sniff_args)
     p.start()
@@ -80,25 +62,18 @@ def get_iw(ips, sport, app_req, mss=64, dport=80):
         send(IP(dst=ip) / TCP(dport=dport, sport=syn_acks[i][TCP].dport, 
             seq=syn_acks[i][TCP].ack, ack=syn_acks[i][TCP].seq + 1, flags='AF', 
             options=[('MSS', mss)]) / app_req[i], verbose=False)
-        # sport += 1
     # print('Took %f seconds to send %d requests' % (time.time() - cur_time, len(ips)))
     replies = parent_conn.recv()
     parent_conn.close()
     p.join()
-    # print('Recovered replies at time %f' % (time.time() - cur_time))
-    # q_lock.acquire()
-    # replies = q.get()
-    # q.put(replies)
-    # q_lock.release()
     for i, ip in enumerate(ips):
         if return_values[i] == None:
             rst = IP(dst=ip) / TCP(dport=dport, sport=syn_acks[i][TCP].dport, 
                 seq=syn_acks[i][TCP].ack, ack=syn_acks[i][TCP].seq + 1, flags='AR')
             send(rst, verbose=False)
             return_values[i] = get_window_size(ip, sport + i, replies, mss, syn_acks[i][TCP].seq)
-    print('Overall, took %f seconds for one round of %d IP addresses' % (time.time() - begin_time, len(ips)))
+    # print('Overall, took %f seconds for one round of %d IP addresses' % (time.time() - begin_time, len(ips)))
     return return_values
-    # return get_window_size(ip, sport, replies, mss, syn_ack[TCP].seq)
 
 def get_window_size(ip, sport, replies, mss, recv_ackno):
     largest_mss = mss
@@ -185,7 +160,7 @@ def repeat_iw_query(ips, sport, reps, mss):
     start_time = time.time()
     urls = ips
     ips = [try_dns(ip) for ip in ips]
-    print('Took {:.2f}s for DNS'.format(time.time() - start_time))
+    # print('Took {:.2f}s for DNS'.format(time.time() - start_time))
 
     begin_time = time.time()
     ips = list(ips)
@@ -210,17 +185,6 @@ def repeat_iw_query(ips, sport, reps, mss):
                 error_ips.append(ips[i])
                 error_idxs.append(i)
                 error_reqs.append(http_error_reqs[i])
-                # ips[i] = None
-                # http_reqs[i] = http_error_reqs[i]
-                # use_error_req = True
-                # results[i] = []
-                # errors[i] = []
-        # if use_error_req:
-        #     iw, error = get_iw(ips, sport, http_error_reqs)
-        # else:
-        #     iw, error = get_iw(ips, sport, http_reqs)
-        # if error != 0:
-        #     iw = -1
         sport += len(ips)
     for i in error_idxs:
         results[i] = []
@@ -234,13 +198,12 @@ def repeat_iw_query(ips, sport, reps, mss):
             errors[error_idxs[i]].append(error) 
         sport += len(error_ips)
 
-    print('{:25s} {}' .format('IP: ', ips))
-    print('{:25s} {}' .format('Initial Window Results:', str(results)))
-    print('{:25s} {}' .format('Returned Code:', str(errors)))
-    print('Total Time: %f' % (time.time() - begin_time))
-    for i in range(len(ips)):
-        print(urls[i], ips[i], use_error_req[i], results[i], errors[i])
-    # print(zip(ips, results, errors))
+    # print('{:25s} {}' .format('IP: ', ips))
+    # print('{:25s} {}' .format('Initial Window Results:', str(results)))
+    # print('{:25s} {}' .format('Returned Code:', str(errors)))
+    # print('Total Time: %f' % (time.time() - begin_time))
+    # for i in range(len(ips)):
+    #     print(urls[i], ips[i], use_error_req[i], results[i], errors[i])
     return results, errors, use_error_req
 
 # retrieves the first `amount` entries from the ip list
@@ -256,32 +219,3 @@ def get_ip_list(amount=100, offset=0, filename='data/ip_list.csv'):
             if len(ip_list) >= amount:
                 break
     return ip_list
-
-
-
-# # returns category and the result number
-# def get_category(results):
-#     num_results = 0
-#     first_result = None
-#     same_result = True
-#     results_dict = {}
-#     for result in results:
-#         if result not in results_dict:
-#             results_dict[result] = 1
-#         else:
-#             results_dict[result] += 1
-#     max_value = -1
-#     result_value = None
-#     num_results = 0
-#     for k, v in results_dict.items():
-#         if v > max_value:
-#             max_value = v
-#             result_value = k
-#         num_results += v
-#     if max_value >= 3:
-#         return 1, result_value
-#     if num_results >= 3:
-#         return 2, result_value
-#     if max_value >= 1:
-#         return 3, result_value
-#     return 5, 0
