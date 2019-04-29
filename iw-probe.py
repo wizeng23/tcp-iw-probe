@@ -1,3 +1,4 @@
+import math
 import pickle
 from scapy.all import *
 import util as U
@@ -12,36 +13,37 @@ result_filename = 'experiment/current/results.csv'
 def main():
     # keith, google, stanford
     # ip_list = ['104.196.238.229', '172.217.6.7', '171.67.215.200']
-    ip_list = U.get_ip_list(amount=1000)
+    ip_list = U.get_ip_list(amount=10)
     print('Got IP list')
     mss = 64
     reps = 5
-    max_workers = 50
+    max_workers = 30
     sport = random.randint(1024, 10000)
     category_lock = Lock()
     categories = {1:[], 2:[], 3:[], 4:[], 5:[]}
     result_file = open(result_filename, 'w')
     result_file_lock = Lock()
-    visited_ip = set()
-    visited_lock = Lock()
 
-    pbar = tqdm(total=len(ip_list)/max_workers)
-    for i in range(len(ip_list) / max_workers):
-        outputs = U.repeat_iw_query(ips=ip_list[(i*max_workers):((i+1)*max_workers)], sport=sport, reps=reps, mss=mss, visited_ip=visited_ip, visited_lock=visited_lock)
-        for j, output in enumerate(outputs):
+    itr = math.ceil(len(ip_list) / max_workers)
+    pbar = tqdm(total=itr)
+    for i in range(itr):
+        end = min((i + 1) * max_workers, len(ip_list))
+        ips = ip_list[(i*max_workers):end]
+        outputs = U.repeat_iw_query(ips=ips, sport=sport, reps=reps, mss=mss)
+        for j, output in enumerate(zip(*outputs)):
             results, statuses = output
             category, result = U.get_category(results)
-            categories[category].append((ips[i*max_workers + j], result))
+            categories[category].append((ips[j], result))
             result_str = ','.join([str(res) for res in results])
             status_str = ','.join([str(stat) for stat in statuses])
-            result_file.write('{},{},{}\n'.format(ips[i*max_workers + j], result_str, status_str))
+            result_file.write('{},{},{}\n'.format(ips[j], result_str, status_str))
             pbar.update(1)
     # result_file.close()
 
     # with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
     #     future_to_ip = {}
     #     for ip in ip_list:
-    #         future_to_ip[executor.submit(U.repeat_iw_query, ip, sport, reps, mss, visited_ip, visited_lock)] = ip
+    #         future_to_ip[executor.submit(U.repeat_iw_query, ip, sport, reps, mss)] = ip
     #         sport += reps * 2
     #     for future in concurrent.futures.as_completed(future_to_ip):
     #         pbar.update(1)

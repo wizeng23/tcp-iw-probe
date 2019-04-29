@@ -171,7 +171,7 @@ def get_category(results):
     else:
         return 5, 0
 
-def repeat_iw_query(ips, sport, reps, mss, visited_ip, visited_lock):
+def repeat_iw_query(ips, sport, reps, mss):
     # if human-readable address, perform DNS query
     # if ip[0].isalpha():
     #     dns_req = IP(dst='8.8.8.8')/UDP(dport=53)/DNS(rd=1, qd=DNSQR(qname=ip))
@@ -179,16 +179,6 @@ def repeat_iw_query(ips, sport, reps, mss, visited_ip, visited_lock):
     #     if answer and answer[DNS] and answer[DNS].an:
     #         ip = answer[DNS].an.rdata
 
-    # lot of human-readable addresses in database resolve to same ip address
-    # should only query each ip address once
-    if visited_lock:
-        visited_lock.acquire()
-        if ip in visited_ip:
-            visited_lock.release()
-            return None
-        else:
-            visited_ip.add(ip)
-            visited_lock.release()
     ips = list(ips)
     http_reqs = ['GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip for ip in ips]
     http_error_reqs = ['GET /' + 'a' * (10 * mss) + ' HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' % ip for ip in ips]
