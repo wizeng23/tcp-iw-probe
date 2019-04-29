@@ -35,6 +35,7 @@ def main():
             result_str = ','.join([str(res) for res in results])
             status_str = ','.join([str(stat) for stat in statuses])
             result_file.write('{},{},{}\n'.format(ips[i*max_workers + j], result_str, status_str))
+            pbar.update(1)
     # result_file.close()
 
     # with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
