@@ -11,7 +11,7 @@ category_filename = 'experiment/current/categories'
 result_filename = 'experiment/current/results.csv'
 
 def main():
-    ip_list = U.get_ip_list(amount=60, offset=0)
+    ip_list = U.get_ip_list(amount=1000, offset=0)
     print('Got IP list')
     mss = 64
     reps = 5

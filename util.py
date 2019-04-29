@@ -59,9 +59,12 @@ def get_iw(ips, sport, app_req, mss=64, dport=80):
     for i, ip in enumerate(ips):
         if return_values[i] != None:
             continue
-        send(IP(dst=ip) / TCP(dport=dport, sport=syn_acks[i][TCP].dport, 
-            seq=syn_acks[i][TCP].ack, ack=syn_acks[i][TCP].seq + 1, flags='AF', 
-            options=[('MSS', mss)]) / app_req[i], verbose=False)
+        try:
+            send(IP(dst=ip) / TCP(dport=dport, sport=syn_acks[i][TCP].dport, 
+                seq=syn_acks[i][TCP].ack, ack=syn_acks[i][TCP].seq + 1, flags='AF', 
+                options=[('MSS', mss)]) / app_req[i], verbose=False)
+        except Exception as e:
+            return_values[i] = (-1, 1)
     # print('Took %f seconds to send %d requests' % (time.time() - cur_time, len(ips)))
     replies = parent_conn.recv()
     parent_conn.close()
