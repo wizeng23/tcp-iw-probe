@@ -12,7 +12,7 @@ from argparse import ArgumentParser
 
 parser = ArgumentParser(description="Initial Window Probe")
 parser.add_argument('--ip',
-                    help="Request results for IP Addresses, split with commas")
+                    help="Request results for IP Addresses or URLS, split with commas")
 parser.add_argument('--low',
                     type=int,
                     help="Low end of list of IP Addresses to request (inclusive)")
